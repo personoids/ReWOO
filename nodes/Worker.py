@@ -248,21 +248,16 @@ class Plugin(Node):
     def __init__(self, name="Plugin"):
         super().__init__(name, input_type=str, output_type=str)
         self.isLLMBased = True
-        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-        self.agnet = create_openapi_agent(reduce_openapi_spec(json.loads(requests.get('http://localhost:5004/openapi.json').content)),RequestsWrapper(), OpenAI(model_name="gpt-4", temperature=0.0) )
+        self.agent = create_openapi_agent(reduce_openapi_spec(json.loads(requests.get('http://localhost:5004/openapi.json').content)),RequestsWrapper(), OpenAI(model_name="gpt-4", temperature=0.0) ,instructions=boot)
         self.description = f'''A plugin (Personoids) that plans, researches, builds, tests, troubleshoots and helps with anything:
 - extend the functionality of the plugin, search the web, execute shell commands, access the filesystem, store and search data in document store (include type and metadata when storing), utilize web requests.
 - create new methods on this plugin: if there is something you are unable to do already, create a method just before you call it.
 
 call the "plan" method before you start a task. Call it method whenever you need to plan anything, or break down a big task into smaller tasks.
-
-{assistant_instructions}
-
-bootstrap_auth_token={bootstrap_auth_token}"
 '''
         
     def run(self, input, log=False):        
-        return self.agnet.run(input)
+        return self.agent.run(input)
 
 WORKER_REGISTRY = {"Google": GoogleWorker(),
                    "Wikipedia": WikipediaWorker(),

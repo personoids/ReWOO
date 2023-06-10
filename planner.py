@@ -195,6 +195,33 @@ def _create_api_planner_tool(
     )
     return tool
 
+import json
+from typing import Union
+from langchain.agents import AgentOutputParser
+from langchain.agents.conversational_chat.prompt import FORMAT_INSTRUCTIONS
+from langchain.output_parsers.json import parse_json_markdown
+from langchain.schema import AgentAction, AgentFinish, OutputParserException
+
+class ConvoOutputParser(AgentOutputParser):
+    def get_format_instructions(self) -> str:
+        return FORMAT_INSTRUCTIONS
+
+    def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
+        try:
+            response = parse_json_markdown(text)
+            action, action_input = response["action"], str(response["action_input"])
+            if action == "Final Answer":
+                return AgentFinish({"output": action_input}, text)
+            else:
+                return AgentAction(action, action_input, text)
+        except Exception as e:
+            raise OutputParserException(f"Could not parse LLM output: {text}") from e
+
+    @property
+    def _type(self) -> str:
+        return "conversational_chat"
+    
+
 
 def _create_api_controller_agent(
     api_url: str,
@@ -207,9 +234,9 @@ def _create_api_controller_agent(
     get_llm_chain = LLMChain(llm=llm, prompt=PARSING_GET_PROMPT)
     post_llm_chain = LLMChain(llm=llm, prompt=PARSING_POST_PROMPT)
     tools: List[BaseTool] = [
-        # RequestsGetToolWithParsing(
-        #     requests_wrapper=requests_wrapper, llm_chain=get_llm_chain
-        # ),
+        RequestsGetToolWithParsing(
+            requests_wrapper=requests_wrapper, llm_chain=get_llm_chain
+        ),
         RequestsPostToolWithParsing(
             requests_wrapper=requests_wrapper, llm_chain=post_llm_chain
         ),
@@ -233,6 +260,7 @@ def _create_api_controller_agent(
         human_message=SUFFIX,
         verbose=True
     )
+    agent.output_parser = ConvoOutputParser()
     # agent = initialize_agent(tools, llm, agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION, verbose=verbose, memory=memory)
     return AgentExecutor.from_agent_and_tools(
         agent=agent,
@@ -274,7 +302,7 @@ def _create_api_controller_tool(
                 raise ValueError(f"{endpoint_name} endpoint does not exist.")
             docs_str += f"== Docs for {endpoint_name} == \n{yaml.dump(docs)}\n"
 
-        agent = _create_api_controller_agent(base_url, docs_str, requests_wrapper, llm,memory,instructions)
+        agent = _create_api_controller_agent(base_url, docs_str, requests_wrapper, llm,memory,instructions)            
         return agent.run(plan_str)
 
     return Tool(
@@ -332,6 +360,7 @@ def create_openapi_agent(
         verbose=verbose,
         **kwargs,
     )
+    agent.output_parser = ConvoOutputParser()
     # return agent
     return AgentExecutor.from_agent_and_tools(
         agent=agent,

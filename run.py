@@ -20,7 +20,7 @@ parser.add_argument('--toolset',
 
 parser.add_argument('--base_lm',
                     type=str,
-                    default='text-davinci-003',
+                    default='gpt-4',
                     help='Base language model to use. Can be text-davinci-003, gpt-3.5-turbo or directory to alpca-lora')
 
 parser.add_argument('--planner_lm',
