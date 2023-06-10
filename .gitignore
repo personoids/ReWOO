@@ -1,2 +1,6 @@
 ./keys/
 .idea/
+keys/openai.key
+keys/serpapi.key
+__pycache__/**
+**/__pycache__/**

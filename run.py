@@ -39,6 +39,10 @@ parser.add_argument('--key_path',
                     type=str,
                     default='./keys/',
                     help='Path where you store your openai.key and serpapi.key. Default to ./key/')
+parser.add_argument('--task',
+                    type=str,
+                    default=None,
+                    help='Prompt')
 
 args = parser.parse_args()
 
@@ -51,10 +55,23 @@ from algos.PWS import *
 from algos.notool import IO, CoT
 from algos.react import ReactExtraTool
 from utils.util import *
+PLUGIN_PWS_EXAMPLES = '''For Example:
+clone the most popular repo on gitlab
+Plan: We need to search for the most popular repo on gitlab. Then we need to clone it.
+#E1 = Plugin[search for the most popular repo on gitlab]
+Plan: Clone the repo.
+#E2 = Plugin[clone #E1]
 
-
+'''
 def main(args):
-    task = input("Ask a question or give a task: ")
+    
+    tools = [
+        "Plugin",
+    ]
+    if(args.task is not None):
+        task = args.task
+    else:
+        task = input("Ask a question or give a task: ")
     if args.method == 'direct':
         method = IO(model_name=args.base_lm)
         response = method.run(task)
@@ -64,7 +81,7 @@ def main(args):
     elif args.method == 'react':
         if args.exemplar is None:
             args.exemplar = fewshots.DEFAULT_REACT
-        method = ReactExtraTool(model_name=args.base_lm, available_tools=args.toolset,
+        method = ReactExtraTool(model_name=args.base_lm, available_tools=tools,
                                 fewshot=args.exemplar, verbose=args.print_trajectory)
         response = method.run(task)
     elif args.method == 'rewoo':
@@ -73,9 +90,9 @@ def main(args):
         if args.solver_lm is None:
             args.solver_lm = args.base_lm
         if args.exemplar is None:
-            args.exemplar = fewshots.TRIVIAQA_PWS
+            args.exemplar = PLUGIN_PWS_EXAMPLES
         method = PWS_Base(planner_model=args.planner_lm, solver_model=args.solver_lm,
-                          fewshot=args.exemplar, available_tools=args.toolset)
+                          fewshot=args.exemplar, available_tools=tools)
         response = method.run(task)
         if args.print_trajectory:
             print("=== Planner ===" + '\n\n' + response["planner_log"] + '\n' + "=== Solver ===" + '\n\n' + response[

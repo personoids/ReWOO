@@ -217,8 +217,52 @@ class SearchDocWorker(Node):
 class SearchSOTUWorker(SearchDocWorker):
     def __init__(self, name="SearchSOTU"):
         super().__init__(name=name, doc_name="state_of_the_union", doc_path="data/docs/state_of_the_union.txt")
+from langchain.agents.tools import Tool
+from langchain.chains.llm import LLMChain
+from langchain.llms.openai import OpenAI
+from langchain.prompts import PromptTemplate
+from langchain.requests import RequestsWrapper
+MAX_RESPONSE_LENGTH = 5000
+
+import json
+import re
+from functools import partial
+from typing import Any, Callable, Dict, List, Optional
+from langchain.agents import Tool
+from langchain.memory import ConversationBufferMemory
+from langchain.chat_models import ChatOpenAI
+from langchain.utilities import SerpAPIWrapper
+from getpass import getpass
 
 
+
+from spec import reduce_openapi_spec
+from planner import create_openapi_agent
+bootstrap_data = json.loads(requests.post('http://localhost:5004/bootstrapPlugin').content)
+bootstrap_auth_token = bootstrap_data["auth_token"]
+assistant_instructions = bootstrap_data["assistantInstructions"]
+boot = "bootstrap_auth_token=" + bootstrap_auth_token + "\n"
+boot += assistant_instructions + "\n"
+class Plugin(Node):
+
+    def __init__(self, name="Plugin"):
+        super().__init__(name, input_type=str, output_type=str)
+        self.isLLMBased = True
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        self.agnet = create_openapi_agent(reduce_openapi_spec(json.loads(requests.get('http://localhost:5004/openapi.json').content)),RequestsWrapper(), OpenAI(model_name="gpt-4", temperature=0.0) )
+        self.description = f'''A plugin (Personoids) that plans, researches, builds, tests, troubleshoots and helps with anything:
+- extend the functionality of the plugin, search the web, execute shell commands, access the filesystem, store and search data in document store (include type and metadata when storing), utilize web requests.
+- create new methods on this plugin: if there is something you are unable to do already, create a method just before you call it.
+
+call the "plan" method before you start a task. Call it method whenever you need to plan anything, or break down a big task into smaller tasks.
+
+{assistant_instructions}
+
+bootstrap_auth_token={bootstrap_auth_token}"
+'''
+        
+    def run(self, input, log=False):        
+        return self.agnet.run(input)
 
 WORKER_REGISTRY = {"Google": GoogleWorker(),
                    "Wikipedia": WikipediaWorker(),
@@ -226,4 +270,6 @@ WORKER_REGISTRY = {"Google": GoogleWorker(),
                    "WolframAlpha": WolframAlphaWorker(),
                    "Calculator": CalculatorWorker(),
                    "LLM": LLMWorker(),
-                   "SearchSOTU": SearchSOTUWorker()}
+                   "SearchSOTU": SearchSOTUWorker(),
+                   "Plugin": Plugin(),
+                   }
